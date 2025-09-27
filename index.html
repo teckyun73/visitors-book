@@ -174,7 +174,7 @@
                 
                 modalContent.innerHTML = `
                     <h3 class="text-2xl font-bold mb-4">${title}</h3>
-                    <div class="text-slate-600">${content}</div>
+                    <div class="text-slate-600 text-left">${content}</div>
                     ${buttonHtml}
                 `;
                 modal.classList.remove('hidden');
@@ -200,15 +200,14 @@
                     const ticketNumber = Math.floor(Math.random() * MAX_TICKETS) + 1;
                     const ticketId = `atec${ticketNumber.toString().padStart(3, '0')}`;
                     
-                    // Check if ticket already exists
                     const { data, error } = await db.from('attendees').select('ticket').eq('ticket', ticketId).maybeSingle();
                     
                     if (error) {
                         console.error("Ticket check error:", error);
-                        return null; // DB 오류 발생
+                        return null;
                     }
                     
-                    if (!data) { // Ticket is available
+                    if (!data) {
                         assignedTicket = ticketId;
                     }
                     attempts++;
@@ -315,7 +314,7 @@
             }
 
             async function runSimulation() {
-                showModal('알림', '<div class="loader"></div><p>가상 데이터를 생성 중입니다...</p>', []);
+                showModal('알림', '<div class="loader"></div><p class="text-center">가상 데이터를 생성 중입니다...</p>', []);
                 const SIMULATION_COUNT = 50;
                 const affiliations = ["에이텍", "에이텍모빌리티", "에이텍오토", "에이텍씨앤", "에이텍시스템", "에이텍컴퓨터"];
                 const positions = ["대표이사", "부사장", "전무", "상무", "이사", "수석", "책임", "선임", "사원"];
@@ -323,7 +322,7 @@
                 let newAttendees = [];
                 for (let i = 1; i <= SIMULATION_COUNT; i++) {
                     const ticket = await assignTicket();
-                    if (!ticket) break; // No more tickets
+                    if (!ticket) break; 
 
                     newAttendees.push({
                         affiliation: affiliations[Math.floor(Math.random() * affiliations.length)],
@@ -338,7 +337,11 @@
                     const { error } = await db.from('attendees').insert(newAttendees);
                     if (error) {
                         console.error("Simulation insert error", error);
-                        showModal('시뮬레이션 실패', '데이터 저장 중 오류가 발생했습니다.', [{ id: 'modal-ok', text: '확인', class: 'bg-red-600 text-white font-bold py-2 px-6 rounded-lg' }]);
+                        if (error.code === '42501') {
+                            showModal('오류: 보안 정책 위반', 'Supabase 데이터베이스의 Row Level Security(RLS) 정책으로 인해 데이터 생성이 차단되었습니다.<br><br><b>해결 방법:</b><br>1. Supabase 프로젝트 대시보드로 이동<br>2. Table Editor에서 "attendees" 테이블 선택<br>3. 상단의 "RLS Enabled" 토글을 비활성화', [{ id: 'modal-ok', text: '확인', class: 'bg-red-600 text-white font-bold py-2 px-6 rounded-lg' }]);
+                        } else {
+                            showModal('시뮬레이션 실패', '데이터 저장 중 오류가 발생했습니다.', [{ id: 'modal-ok', text: '확인', class: 'bg-red-600 text-white font-bold py-2 px-6 rounded-lg' }]);
+                        }
                     } else {
                         await renderAdminDashboard();
                         showModal('시뮬레이션 완료', `${newAttendees.length}명의 가상 참석자 데이터가 생성되었습니다.`, [{ id: 'modal-ok', text: '확인', class: 'bg-indigo-600 text-white font-bold py-2 px-6 rounded-lg' }]);
@@ -358,7 +361,6 @@
                 const formData = new FormData(this);
                 const data = Object.fromEntries(formData.entries());
 
-                // Check for duplicate email
                 const { data: existing, error } = await db.from('attendees').select('email').eq('email', data.email).maybeSingle();
                 if (error) {
                     showModal('오류', '데이터베이스 확인 중 오류가 발생했습니다.', [{ id: 'modal-ok', text: '확인', class: 'bg-indigo-600 text-white font-bold py-2 px-6' }]);
@@ -443,7 +445,7 @@
                             delete modal.dataset.pendingRegistration;
 
                             hideModal();
-                            showModal('알림', '<div class="loader"></div><p>투표권을 발급하고 있습니다...</p>', []);
+                            showModal('알림', '<div class="loader"></div><p class="text-center">투표권을 발급하고 있습니다...</p>', []);
                             
                             const ticket = await assignTicket();
                             if (!ticket) {
@@ -455,12 +457,16 @@
 
                             if (error) {
                                 console.error("Submit error:", error);
-                                showModal('오류', '데이터 저장 중 오류가 발생했습니다.', [{ id: 'modal-ok', text: '확인', class: 'bg-red-600 text-white font-bold py-2 px-6' }]);
+                                if (error.code === '42501') {
+                                    showModal('오류: 보안 정책 위반', 'Supabase 데이터베이스의 Row Level Security(RLS) 정책으로 인해 등록이 차단되었습니다.<br><br><b>해결 방법:</b><br>1. Supabase 프로젝트 대시보드로 이동<br>2. Table Editor에서 "attendees" 테이블 선택<br>3. 상단의 "RLS Enabled" 토글을 비활성화', [{ id: 'modal-ok', text: '확인', class: 'bg-red-600 text-white font-bold py-2 px-6' }]);
+                                } else {
+                                    showModal('오류', '데이터 저장 중 오류가 발생했습니다.', [{ id: 'modal-ok', text: '확인', class: 'bg-red-600 text-white font-bold py-2 px-6' }]);
+                                }
                                 return;
                             }
 
                             registrationForm.reset();
-                            const successContent = `<div id="ticket-to-save" class="bg-white p-4 rounded-lg"><p class="text-lg">성공적으로 등록되었습니다.</p><p class="mt-4 text-4xl font-bold font-mono text-indigo-600 tracking-widest">${ticket}</p><p class="mt-2 text-sm text-slate-500">귀하의 투표권 번호입니다. 잘 보관해주세요.</p></div>`;
+                            const successContent = `<div id="ticket-to-save" class="bg-white p-4 rounded-lg text-center"><p class="text-lg">성공적으로 등록되었습니다.</p><p class="mt-4 text-4xl font-bold font-mono text-indigo-600 tracking-widest">${ticket}</p><p class="mt-2 text-sm text-slate-500">귀하의 투표권 번호입니다. 잘 보관해주세요.</p></div>`;
                             showModal('감사합니다!', successContent, [
                                 { id: 'modal-save-image', text: '이미지로 저장', class: 'bg-green-600 text-white font-bold py-2 px-6' },
                                 { id: 'modal-ok', text: '확인', class: 'bg-indigo-600 text-white font-bold py-2 px-6' }
@@ -470,10 +476,14 @@
                         break;
                      case 'modal-delete-confirm':
                         hideModal();
-                        showModal('알림', '<div class="loader"></div><p>데이터를 삭제하는 중입니다...</p>', []);
-                        const { error } = await db.from('attendees').delete().neq('id', -1); // DANGEROUS: Deletes all rows
+                        showModal('알림', '<div class="loader"></div><p class="text-center">데이터를 삭제하는 중입니다...</p>', []);
+                        const { error } = await db.from('attendees').delete().neq('id', -1);
                         if (error) {
-                            showModal('오류', '데이터 삭제 중 오류가 발생했습니다.', [{ id: 'modal-ok', text: '확인', class: 'bg-red-600 text-white font-bold py-2 px-6' }]);
+                             if (error.code === '42501') {
+                                showModal('오류: 보안 정책 위반', 'Supabase 데이터베이스의 Row Level Security(RLS) 정책으로 인해 삭제가 차단되었습니다.<br><br><b>해결 방법:</b><br>1. Supabase 프로젝트 대시보드로 이동<br>2. Table Editor에서 "attendees" 테이블 선택<br>3. 상단의 "RLS Enabled" 토글을 비활성화', [{ id: 'modal-ok', text: '확인', class: 'bg-red-600 text-white font-bold py-2 px-6' }]);
+                            } else {
+                                showModal('오류', '데이터 삭제 중 오류가 발생했습니다.', [{ id: 'modal-ok', text: '확인', class: 'bg-red-600 text-white font-bold py-2 px-6' }]);
+                            }
                         } else {
                             await renderAdminDashboard();
                             showModal('완료', '모든 데이터가 성공적으로 삭제되었습니다.', [{ id: 'modal-ok', text: '확인', class: 'bg-indigo-600 text-white font-bold py-2 px-6' }]);
