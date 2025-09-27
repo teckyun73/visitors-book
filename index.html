@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2025 경영혁신 Best Practice 경진대회 (Supabase)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans KR', sans-serif; }
+        .chart-bar { transition: width 0.5s ease-in-out; }
+        .modal-scale-enter { transform: scale(0.95); opacity: 0; }
+        .modal-scale-enter-active { transform: scale(1); opacity: 1; transition: all 0.2s ease-out; }
+        .modal-scale-leave-active { transform: scale(0.95); opacity: 0; transition: all 0.2s ease-in; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+    <!-- App Container -->
+    <div id="app" class="container mx-auto p-4 md:p-8 max-w-4xl">
+        <!-- Header -->
+        <header class="text-center mb-8 md:mb-12">
+            <h1 class="text-3xl md:text-4xl font-bold text-slate-700">2025 경영혁신 Best Practice 경진대회</h1>
+            <p class="text-slate-500 mt-2">참석자 등록 및 투표권 발급</p>
+        </header>
+
+        <!-- User Registration View -->
+        <main id="user-view">
+            <!-- Form is here -->
+            <div class="bg-white p-6 md:p-8 rounded-xl shadow-md">
+                <h2 class="text-2xl font-semibold mb-6 text-center">참석자 등록</h2>
+                <form id="registration-form" class="space-y-6">
+                    <div>
+                        <label for="affiliation" class="block text-sm font-medium text-slate-600 mb-1">소속 (법인명)</label>
+                        <select id="affiliation" name="affiliation" required class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition bg-white">
+                            <option value="" disabled selected>소속 법인을 선택하세요</option>
+                            <option value="에이텍">에이텍</option>
+                            <option value="에이텍모빌리티">에이텍모빌리티</option>
+                            <option value="에이텍오토">에이텍오토</option>
+                            <option value="에이텍씨앤">에이텍씨앤</option>
+                            <option value="에이텍시스템">에이텍시스템</option>
+                            <option value="에이텍컴퓨터">에이텍컴퓨터</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="name" class="block text-sm font-medium text-slate-600 mb-1">성명</label>
+                        <input type="text" id="name" name="name" required class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition" placeholder="예: 홍길동">
+                    </div>
+                    <div>
+                        <label for="position" class="block text-sm font-medium text-slate-600 mb-1">직급</label>
+                        <select id="position" name="position" required class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition bg-white">
+                            <option value="" disabled selected>직급을 선택하세요</option>
+                            <option value="대표이사">대표이사</option>
+                            <option value="부사장">부사장</option>
+                            <option value="전무">전무</option>
+                            <option value="상무">상무</option>
+                            <option value="이사">이사</option>
+                            <option value="수석">수석</option>
+                            <option value="책임">책임</option>
+                            <option value="선임">선임</option>
+                            <option value="사원">사원</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="email" class="block text-sm font-medium text-slate-600 mb-1">이메일</label>
+                        <input type="email" id="email" name="email" required class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition" placeholder="예: honggildong@atec.kr">
+                    </div>
+                    <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-300">
+                        등록 및 투표권 발급
+                    </button>
+                </form>
+            </div>
+             <div class="text-center mt-4">
+                <button id="admin-login-btn" class="text-sm text-slate-500 hover:text-indigo-600">관리자 모드</button>
+            </div>
+        </main>
+
+        <!-- Admin View (Hidden by default) -->
+        <section id="admin-view" class="hidden">
+           <div class="bg-white p-6 md:p-8 rounded-xl shadow-md">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-semibold">관리자 대시보드</h2>
+                    <div class="flex gap-2 flex-wrap justify-end">
+                         <button id="run-simulation-btn" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition">시뮬레이션</button>
+                         <button id="delete-all-btn" class="bg-red-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-700 transition">전체 삭제</button>
+                         <button id="logout-btn" class="bg-slate-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-slate-600 transition">로그아웃</button>
+                    </div>
+                </div>
+                
+                <div class="mb-8">
+                    <h3 class="text-xl font-semibold mb-4">법인별 참석 현황</h3>
+                    <div id="chart-container" class="p-4 bg-slate-50 rounded-lg min-h-[100px]">
+                        <!-- Chart or loader will be rendered here -->
+                    </div>
+                </div>
+
+                <div>
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-semibold">참석자 목록</h3>
+                        <button id="download-csv" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition">CSV로 저장</button>
+                    </div>
+                    <div id="table-container" class="overflow-x-auto min-h-[150px]">
+                        <table id="attendee-table" class="w-full text-sm text-left text-slate-500">
+                            <thead class="text-xs text-slate-700 uppercase bg-slate-100">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3">소속</th>
+                                    <th scope="col" class="px-6 py-3">성명</th>
+                                    <th scope="col" class="px-6 py-3">직급</th>
+                                    <th scope="col" class="px-6 py-3">이메일</th>
+                                    <th scope="col" class="px-6 py-3">투표권 번호</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Data or loader will be rendered here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Modal (Hidden by default) -->
+        <div id="modal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center p-4 z-50">
+            <div id="modal-content" class="bg-white rounded-xl shadow-2xl p-8 w-full max-w-md text-center modal-scale-enter">
+                <!-- Content will be injected by JS -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Supabase Setup ---
+        const SUPABASE_URL = 'https://fcbtfnactdmhwjfpsqsw.supabase.co'; // 여기에 Supabase 프로젝트 URL을 입력하세요.
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZjYnRmbmFjdGRtaHdqZnBzcXN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg5NTM1NzksImV4cCI6MjA3NDUyOTU3OX0.outggEOhqzeMT9NcI0p0ORpmk2jjuDi8WFJmO3MlG2g'; // 여기에 Supabase anon 키를 입력하세요.
+        
+        if (SUPABASE_URL === 'YOUR_SUPABASE_URL' || SUPABASE_ANON_KEY === 'YOUR_SUPABASE_ANON_KEY') {
+            alert('Supabase URL과 Key를 스크립트에서 설정해야 합니다.');
+        } else {
+            const { createClient } = supabase;
+            const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+            // --- DOM Elements ---
+            const userView = document.getElementById('user-view');
+            const adminView = document.getElementById('admin-view');
+            const adminLoginBtn = document.getElementById('admin-login-btn');
+            const logoutBtn = document.getElementById('logout-btn');
+            const registrationForm = document.getElementById('registration-form');
+            const downloadCsvBtn = document.getElementById('download-csv');
+            const deleteAllBtn = document.getElementById('delete-all-btn');
+            const runSimulationBtn = document.getElementById('run-simulation-btn');
+            const attendeeTableBody = document.querySelector('#attendee-table tbody');
+            const chartContainer = document.getElementById('chart-container');
+            const tableContainer = document.getElementById('table-container');
+            const modal = document.getElementById('modal');
+            const modalContent = document.getElementById('modal-content');
+
+            // --- UI Functions ---
+            function showLoader(element) {
+                element.innerHTML = '<div class="loader"></div>';
+            }
+            
+            function showModal(title, content, buttons) {
+                let buttonHtml = '';
+                if (buttons && buttons.length > 0) {
+                     buttonHtml = '<div class="flex justify-end gap-4 mt-6">';
+                     buttons.forEach(btn => {
+                         buttonHtml += `<button id="${btn.id}" class="${btn.class}">${btn.text}</button>`;
+                     });
+                     buttonHtml += '</div>';
+                }
+                
+                modalContent.innerHTML = `
+                    <h3 class="text-2xl font-bold mb-4">${title}</h3>
+                    <div class="text-slate-600">${content}</div>
+                    ${buttonHtml}
+                `;
+                modal.classList.remove('hidden');
+                setTimeout(() => modalContent.classList.add('modal-scale-enter-active'), 10);
+            }
+
+            function hideModal() {
+                modalContent.classList.remove('modal-scale-enter-active');
+                modalContent.classList.add('modal-scale-leave-active');
+                setTimeout(() => {
+                    modal.classList.add('hidden');
+                    modalContent.classList.remove('modal-scale-leave-active');
+                }, 200);
+            }
+            
+            // --- Core Functions ---
+            async function assignTicket() {
+                const MAX_TICKETS = 200;
+                let assignedTicket = null;
+                let attempts = 0;
+
+                while (!assignedTicket && attempts < 10) { // 무한 루프 방지
+                    const ticketNumber = Math.floor(Math.random() * MAX_TICKETS) + 1;
+                    const ticketId = `atec${ticketNumber.toString().padStart(3, '0')}`;
+                    
+                    // Check if ticket already exists
+                    const { data, error } = await db.from('attendees').select('ticket').eq('ticket', ticketId).maybeSingle();
+                    
+                    if (error) {
+                        console.error("Ticket check error:", error);
+                        return null; // DB 오류 발생
+                    }
+                    
+                    if (!data) { // Ticket is available
+                        assignedTicket = ticketId;
+                    }
+                    attempts++;
+                }
+                return assignedTicket;
+            }
+
+            // --- Admin Functions ---
+            async function fetchAttendees() {
+                const { data, error } = await db.from('attendees').select('*').order('created_at', { ascending: false });
+                if (error) {
+                    console.error('Error fetching attendees:', error);
+                    return [];
+                }
+                return data;
+            }
+
+            async function renderAdminDashboard() {
+                showLoader(chartContainer);
+                showLoader(tableContainer);
+                
+                const attendees = await fetchAttendees();
+
+                renderTable(attendees);
+                renderChart(attendees);
+            }
+
+            function renderTable(attendees) {
+                const tableHtml = `
+                    <table id="attendee-table" class="w-full text-sm text-left text-slate-500">
+                        <thead class="text-xs text-slate-700 uppercase bg-slate-100">
+                            <tr>
+                                <th scope="col" class="px-6 py-3">소속</th>
+                                <th scope="col" class="px-6 py-3">성명</th>
+                                <th scope="col" class="px-6 py-3">직급</th>
+                                <th scope="col" class="px-6 py-3">이메일</th>
+                                <th scope="col" class="px-6 py-3">투표권 번호</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${attendees.length === 0 ? '<tr class="bg-white"><td colspan="5" class="px-6 py-4 text-center">등록된 참석자가 없습니다.</td></tr>' : attendees.map(att => `
+                                <tr class="bg-white border-b">
+                                    <td class="px-6 py-4">${att.affiliation}</td>
+                                    <td class="px-6 py-4 font-medium text-slate-900">${att.name}</td>
+                                    <td class="px-6 py-4">${att.position}</td>
+                                    <td class="px-6 py-4">${att.email}</td>
+                                    <td class="px-6 py-4 font-mono">${att.ticket}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+                tableContainer.innerHTML = tableHtml;
+            }
+
+            function renderChart(attendees) {
+                if (attendees.length === 0) {
+                    chartContainer.innerHTML = '<p class="text-center text-slate-500">데이터가 없습니다.</p>';
+                    return;
+                }
+                const countsByAffiliation = attendees.reduce((acc, att) => {
+                    const affiliation = att.affiliation || '기타';
+                    acc[affiliation] = (acc[affiliation] || 0) + 1;
+                    return acc;
+                }, {});
+                
+                const maxCount = Math.max(...Object.values(countsByAffiliation), 0);
+                let chartHtml = '<div class="space-y-3">';
+                for (const [affiliation, count] of Object.entries(countsByAffiliation)) {
+                    const width = maxCount > 0 ? (count / maxCount) * 100 : 0;
+                    chartHtml += `
+                        <div class="grid grid-cols-5 gap-2 items-center text-sm">
+                            <div class="font-medium truncate col-span-1">${affiliation}</div>
+                            <div class="col-span-4 bg-slate-200 rounded-full h-7">
+                                <div class="chart-bar bg-indigo-500 h-7 rounded-full flex items-center justify-end pr-2 text-white font-semibold" style="width: ${width}%">
+                                    <span>${count}명</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+                chartHtml += '</div>';
+                chartContainer.innerHTML = chartHtml;
+            }
+
+            async function downloadCSV() {
+                const attendees = await fetchAttendees();
+                if (attendees.length === 0) {
+                     showModal('알림', '저장할 데이터가 없습니다.', [{ id: 'modal-ok', text: '확인', class: 'bg-indigo-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-indigo-700' }]);
+                    return;
+                }
+                const headers = ['소속', '성명', '직급', '이메일', '투표권번호'];
+                const csvContent = [
+                    headers.join(','),
+                    ...attendees.map(att => `"${att.affiliation}","${att.name}","${att.position}","${att.email}","${att.ticket}"`)
+                ].join('\n');
+                const blob = new Blob([`\uFEFF${csvContent}`], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = '2025_경진대회_참석자_목록.csv';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+
+            async function runSimulation() {
+                showModal('알림', '<div class="loader"></div><p>가상 데이터를 생성 중입니다...</p>', []);
+                const SIMULATION_COUNT = 50;
+                const affiliations = ["에이텍", "에이텍모빌리티", "에이텍오토", "에이텍씨앤", "에이텍시스템", "에이텍컴퓨터"];
+                const positions = ["대표이사", "부사장", "전무", "상무", "이사", "수석", "책임", "선임", "사원"];
+                
+                let newAttendees = [];
+                for (let i = 1; i <= SIMULATION_COUNT; i++) {
+                    const ticket = await assignTicket();
+                    if (!ticket) break; // No more tickets
+
+                    newAttendees.push({
+                        affiliation: affiliations[Math.floor(Math.random() * affiliations.length)],
+                        name: `시뮬레이션${i}`,
+                        position: positions[Math.floor(Math.random() * positions.length)],
+                        email: `sim_${Date.now()}_${i}@atec.kr`,
+                        ticket: ticket
+                    });
+                }
+
+                if (newAttendees.length > 0) {
+                    const { error } = await db.from('attendees').insert(newAttendees);
+                    if (error) {
+                        console.error("Simulation insert error", error);
+                        showModal('시뮬레이션 실패', '데이터 저장 중 오류가 발생했습니다.', [{ id: 'modal-ok', text: '확인', class: 'bg-red-600 text-white font-bold py-2 px-6 rounded-lg' }]);
+                    } else {
+                        await renderAdminDashboard();
+                        showModal('시뮬레이션 완료', `${newAttendees.length}명의 가상 참석자 데이터가 생성되었습니다.`, [{ id: 'modal-ok', text: '확인', class: 'bg-indigo-600 text-white font-bold py-2 px-6 rounded-lg' }]);
+                    }
+                } else {
+                    showModal('시뮬레이션 실패', '더 이상 발급할 투표권이 없거나 오류가 발생했습니다.', [{ id: 'modal-ok', text: '확인', class: 'bg-indigo-600 text-white font-bold py-2 px-6 rounded-lg' }]);
+                }
+            }
+
+            // --- Event Handlers ---
+            registrationForm.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                const submitButton = this.querySelector('button[type="submit"]');
+                submitButton.disabled = true;
+                submitButton.textContent = '처리 중...';
+
+                const formData = new FormData(this);
+                const data = Object.fromEntries(formData.entries());
+
+                // Check for duplicate email
+                const { data: existing, error } = await db.from('attendees').select('email').eq('email', data.email).maybeSingle();
+                if (error) {
+                    showModal('오류', '데이터베이스 확인 중 오류가 발생했습니다.', [{ id: 'modal-ok', text: '확인', class: 'bg-indigo-600 text-white font-bold py-2 px-6' }]);
+                    submitButton.disabled = false;
+                    submitButton.textContent = '등록 및 투표권 발급';
+                    return;
+                }
+
+                if (existing) {
+                    showModal('등록 오류', '이미 등록된 이메일 주소입니다. 관리자에게 문의해주세요.', [{ id: 'modal-ok', text: '확인', class: 'bg-indigo-600 text-white font-bold py-2 px-6' }]);
+                    submitButton.disabled = false;
+                    submitButton.textContent = '등록 및 투표권 발급';
+                    return;
+                }
+                
+                const content = `
+                    <div class="space-y-2 text-left">
+                        <p><strong>소속:</strong> ${data.affiliation}</p>
+                        <p><strong>성명:</strong> ${data.name}</p>
+                        <p><strong>직급:</strong> ${data.position}</p>
+                        <p><strong>이메일:</strong> ${data.email}</p>
+                    </div>
+                    <p class="mt-4 text-sm text-red-600">위 정보가 정확한지 확인 후 최종 제출해주세요.</p>
+                `;
+                showModal('등록 정보 확인', content, [
+                    { id: 'modal-cancel', text: '취소', class: 'bg-slate-200 text-slate-800 font-bold py-2 px-6 rounded-lg' },
+                    { id: 'modal-submit', text: '최종 제출', class: 'bg-indigo-600 text-white font-bold py-2 px-6 rounded-lg' }
+                ]);
+                modal.dataset.pendingRegistration = JSON.stringify(data);
+                submitButton.disabled = false;
+                submitButton.textContent = '등록 및 투표권 발급';
+            });
+
+            adminLoginBtn.addEventListener('click', () => {
+                 const content = `<form id="admin-login-form" class="space-y-4">
+                        <div><label for="adminId" class="block text-sm font-medium text-slate-600 mb-1 text-left">ID</label><input type="text" id="adminId" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500"></div>
+                        <div><label for="adminPw" class="block text-sm font-medium text-slate-600 mb-1 text-left">Password</label><input type="password" id="adminPw" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500"></div>
+                    </form>`;
+                 showModal('관리자 로그인', content, [
+                    { id: 'modal-cancel', text: '취소', class: 'bg-slate-200 text-slate-800 font-bold py-2 px-6' },
+                    { id: 'modal-login', text: '로그인', class: 'bg-indigo-600 text-white font-bold py-2 px-6' }
+                ]);
+            });
+
+            logoutBtn.addEventListener('click', () => {
+                adminView.classList.add('hidden');
+                userView.classList.remove('hidden');
+            });
+
+            downloadCsvBtn.addEventListener('click', downloadCSV);
+            runSimulationBtn.addEventListener('click', runSimulation);
+
+            deleteAllBtn.addEventListener('click', () => {
+                 showModal('데이터 전체 삭제', '<p class="text-red-600 font-bold">정말로 모든 참석자 정보를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.</p>', [
+                    { id: 'modal-cancel', text: '취소', class: 'bg-slate-200 text-slate-800 font-bold py-2 px-6' },
+                    { id: 'modal-delete-confirm', text: '삭제 실행', class: 'bg-red-600 text-white font-bold py-2 px-6' }
+                ]);
+            });
+            
+            modal.addEventListener('click', async (e) => {
+                const targetId = e.target.id;
+                switch(targetId) {
+                    case 'modal-cancel':
+                    case 'modal-ok':
+                        hideModal();
+                        break;
+                    case 'modal-login':
+                        const id = document.getElementById('adminId').value;
+                        const pw = document.getElementById('adminPw').value;
+                        if (id === 'admin' && pw === '$atec@000$') {
+                            hideModal();
+                            userView.classList.add('hidden');
+                            adminView.classList.remove('hidden');
+                            renderAdminDashboard();
+                        } else {
+                             showModal('로그인 실패', 'ID 또는 비밀번호가 올바르지 않습니다.', [{ id: 'modal-ok', text: '확인', class: 'bg-indigo-600 text-white font-bold py-2 px-6' }]);
+                        }
+                        break;
+                    case 'modal-submit':
+                        if (modal.dataset.pendingRegistration) {
+                            const data = JSON.parse(modal.dataset.pendingRegistration);
+                            delete modal.dataset.pendingRegistration;
+
+                            hideModal();
+                            showModal('알림', '<div class="loader"></div><p>투표권을 발급하고 있습니다...</p>', []);
+                            
+                            const ticket = await assignTicket();
+                            if (!ticket) {
+                                showModal('오류', '발급할 수 있는 투표권이 모두 소진되었거나 오류가 발생했습니다.', [{ id: 'modal-ok', text: '확인', class: 'bg-indigo-600 text-white font-bold py-2 px-6' }]);
+                                return;
+                            }
+                            
+                            const { error } = await db.from('attendees').insert([{ ...data, ticket }]);
+
+                            if (error) {
+                                console.error("Submit error:", error);
+                                showModal('오류', '데이터 저장 중 오류가 발생했습니다.', [{ id: 'modal-ok', text: '확인', class: 'bg-red-600 text-white font-bold py-2 px-6' }]);
+                                return;
+                            }
+
+                            registrationForm.reset();
+                            const successContent = `<div id="ticket-to-save" class="bg-white p-4 rounded-lg"><p class="text-lg">성공적으로 등록되었습니다.</p><p class="mt-4 text-4xl font-bold font-mono text-indigo-600 tracking-widest">${ticket}</p><p class="mt-2 text-sm text-slate-500">귀하의 투표권 번호입니다. 잘 보관해주세요.</p></div>`;
+                            showModal('감사합니다!', successContent, [
+                                { id: 'modal-save-image', text: '이미지로 저장', class: 'bg-green-600 text-white font-bold py-2 px-6' },
+                                { id: 'modal-ok', text: '확인', class: 'bg-indigo-600 text-white font-bold py-2 px-6' }
+                            ]);
+                            modal.dataset.ticketNumber = ticket;
+                        }
+                        break;
+                     case 'modal-delete-confirm':
+                        hideModal();
+                        showModal('알림', '<div class="loader"></div><p>데이터를 삭제하는 중입니다...</p>', []);
+                        const { error } = await db.from('attendees').delete().neq('id', -1); // DANGEROUS: Deletes all rows
+                        if (error) {
+                            showModal('오류', '데이터 삭제 중 오류가 발생했습니다.', [{ id: 'modal-ok', text: '확인', class: 'bg-red-600 text-white font-bold py-2 px-6' }]);
+                        } else {
+                            await renderAdminDashboard();
+                            showModal('완료', '모든 데이터가 성공적으로 삭제되었습니다.', [{ id: 'modal-ok', text: '확인', class: 'bg-indigo-600 text-white font-bold py-2 px-6' }]);
+                        }
+                        break;
+                    case 'modal-save-image':
+                        const ticketElement = document.getElementById('ticket-to-save');
+                        const ticketNumber = modal.dataset.ticketNumber || 'ticket';
+                        if(ticketElement && typeof html2canvas !== 'undefined') {
+                            html2canvas(ticketElement, { scale: 2, backgroundColor: null }).then(canvas => {
+                                const link = document.createElement('a');
+                                link.download = `투표권_${ticketNumber}.png`;
+                                link.href = canvas.toDataURL("image/png").replace("image/png", "image/octet-stream");
+                                link.click();
+                            });
+                        } else { alert('이미지 저장 기능을 사용할 수 없습니다.'); }
+                        break;
+                }
+            });
+        }
+    </script>
+</body>
+</html>
+
