@@ -315,14 +315,34 @@
 
             async function runSimulation() {
                 showModal('알림', '<div class="loader"></div><p class="text-center">가상 데이터를 생성 중입니다...</p>', []);
+                
+                // 1. Fetch all existing tickets first
+                const { data: existingAttendees, error: fetchError } = await db.from('attendees').select('ticket');
+                if (fetchError) {
+                    showModal('오류', '기존 투표권 정보를 가져오는 데 실패했습니다.', [{ id: 'modal-ok', text: '확인', class: 'bg-red-600 text-white font-bold py-2 px-6 rounded-lg' }]);
+                    return;
+                }
+                const existingTickets = new Set(existingAttendees.map(a => a.ticket));
+
+                // 2. Determine available tickets
+                const allPossibleTickets = Array.from({ length: 200 }, (_, i) => `atec${(i + 1).toString().padStart(3, '0')}`);
+                let availableTickets = allPossibleTickets.filter(t => !existingTickets.has(t));
+
+                // 3. Shuffle the available tickets for randomness
+                availableTickets.sort(() => 0.5 - Math.random());
+
                 const SIMULATION_COUNT = 50;
                 const affiliations = ["에이텍", "에이텍모빌리티", "에이텍오토", "에이텍씨앤", "에이텍시스템", "에이텍컴퓨터"];
                 const positions = ["대표이사", "부사장", "전무", "상무", "이사", "수석", "책임", "선임", "사원"];
                 
                 let newAttendees = [];
+                // 4. Create new attendees using the available tickets
                 for (let i = 1; i <= SIMULATION_COUNT; i++) {
-                    const ticket = await assignTicket();
-                    if (!ticket) break; 
+                    if (availableTickets.length === 0) {
+                        console.warn("No more available tickets for simulation.");
+                        break; // Stop if we run out of tickets
+                    }
+                    const ticket = availableTickets.pop(); // Get a unique available ticket
 
                     newAttendees.push({
                         affiliation: affiliations[Math.floor(Math.random() * affiliations.length)],
@@ -340,14 +360,14 @@
                         if (error.code === '42501') {
                             showModal('오류: 보안 정책 위반', 'Supabase 데이터베이스의 Row Level Security(RLS) 정책으로 인해 데이터 생성이 차단되었습니다.<br><br><b>해결 방법:</b><br>1. Supabase 프로젝트 대시보드로 이동<br>2. Table Editor에서 "attendees" 테이블 선택<br>3. 상단의 "RLS Enabled" 토글을 비활성화', [{ id: 'modal-ok', text: '확인', class: 'bg-red-600 text-white font-bold py-2 px-6 rounded-lg' }]);
                         } else {
-                            showModal('시뮬레이션 실패', '데이터 저장 중 오류가 발생했습니다.', [{ id: 'modal-ok', text: '확인', class: 'bg-red-600 text-white font-bold py-2 px-6 rounded-lg' }]);
+                            showModal('시뮬레이션 실패', '데이터 저장 중 오류가 발생했습니다.<br>오류: ' + error.message, [{ id: 'modal-ok', text: '확인', class: 'bg-red-600 text-white font-bold py-2 px-6 rounded-lg' }]);
                         }
                     } else {
                         await renderAdminDashboard();
                         showModal('시뮬레이션 완료', `${newAttendees.length}명의 가상 참석자 데이터가 생성되었습니다.`, [{ id: 'modal-ok', text: '확인', class: 'bg-indigo-600 text-white font-bold py-2 px-6 rounded-lg' }]);
                     }
                 } else {
-                    showModal('시뮬레이션 실패', '더 이상 발급할 투표권이 없거나 오류가 발생했습니다.', [{ id: 'modal-ok', text: '확인', class: 'bg-indigo-600 text-white font-bold py-2 px-6 rounded-lg' }]);
+                    showModal('시뮬레이션 정보', '생성할 수 있는 가상 참석자가 없습니다 (모든 투표권이 소진되었을 수 있습니다).', [{ id: 'modal-ok', text: '확인', class: 'bg-indigo-600 text-white font-bold py-2 px-6 rounded-lg' }]);
                 }
             }
 
@@ -496,7 +516,7 @@
                             html2canvas(ticketElement, { scale: 2, backgroundColor: null }).then(canvas => {
                                 const link = document.createElement('a');
                                 link.download = `투표권_${ticketNumber}.png`;
-                                link.href = canvas.toDataURL("image/png").replace("image/png", "image/octet-stream");
+                                link.href = canvas.toDataURL("image-png").replace("image/png", "image/octet-stream");
                                 link.click();
                             });
                         } else { alert('이미지 저장 기능을 사용할 수 없습니다.'); }
