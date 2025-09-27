@@ -86,6 +86,7 @@
                     <h2 class="text-2xl font-semibold">관리자 대시보드</h2>
                     <div class="flex gap-2 flex-wrap justify-end">
                          <button id="run-simulation-btn" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition">시뮬레이션</button>
+                         <button id="delete-simulation-btn" class="bg-orange-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-orange-600 transition">시뮬레이션 데이터 삭제</button>
                          <button id="delete-all-btn" class="bg-red-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-700 transition">전체 삭제</button>
                          <button id="logout-btn" class="bg-slate-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-slate-600 transition">로그아웃</button>
                     </div>
@@ -150,6 +151,7 @@
             const registrationForm = document.getElementById('registration-form');
             const downloadCsvBtn = document.getElementById('download-csv');
             const deleteAllBtn = document.getElementById('delete-all-btn');
+            const deleteSimulationBtn = document.getElementById('delete-simulation-btn');
             const runSimulationBtn = document.getElementById('run-simulation-btn');
             const attendeeTableBody = document.querySelector('#attendee-table tbody');
             const chartContainer = document.getElementById('chart-container');
@@ -316,7 +318,6 @@
             async function runSimulation() {
                 showModal('알림', '<div class="loader"></div><p class="text-center">가상 데이터를 생성 중입니다...</p>', []);
                 
-                // 1. Fetch all existing tickets first
                 const { data: existingAttendees, error: fetchError } = await db.from('attendees').select('ticket');
                 if (fetchError) {
                     showModal('오류', '기존 투표권 정보를 가져오는 데 실패했습니다.', [{ id: 'modal-ok', text: '확인', class: 'bg-red-600 text-white font-bold py-2 px-6 rounded-lg' }]);
@@ -324,11 +325,9 @@
                 }
                 const existingTickets = new Set(existingAttendees.map(a => a.ticket));
 
-                // 2. Determine available tickets
                 const allPossibleTickets = Array.from({ length: 200 }, (_, i) => `atec${(i + 1).toString().padStart(3, '0')}`);
                 let availableTickets = allPossibleTickets.filter(t => !existingTickets.has(t));
 
-                // 3. Shuffle the available tickets for randomness
                 availableTickets.sort(() => 0.5 - Math.random());
 
                 const SIMULATION_COUNT = 50;
@@ -336,13 +335,12 @@
                 const positions = ["대표이사", "부사장", "전무", "상무", "이사", "수석", "책임", "선임", "사원"];
                 
                 let newAttendees = [];
-                // 4. Create new attendees using the available tickets
                 for (let i = 1; i <= SIMULATION_COUNT; i++) {
                     if (availableTickets.length === 0) {
                         console.warn("No more available tickets for simulation.");
-                        break; // Stop if we run out of tickets
+                        break;
                     }
-                    const ticket = availableTickets.pop(); // Get a unique available ticket
+                    const ticket = availableTickets.pop();
 
                     newAttendees.push({
                         affiliation: affiliations[Math.floor(Math.random() * affiliations.length)],
@@ -439,6 +437,13 @@
                     { id: 'modal-delete-confirm', text: '삭제 실행', class: 'bg-red-600 text-white font-bold py-2 px-6' }
                 ]);
             });
+
+            deleteSimulationBtn.addEventListener('click', () => {
+                 showModal('시뮬레이션 데이터 삭제', '<p class="text-orange-600 font-bold">정말로 모든 시뮬레이션 데이터를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.</p>', [
+                    { id: 'modal-cancel', text: '취소', class: 'bg-slate-200 text-slate-800 font-bold py-2 px-6' },
+                    { id: 'modal-delete-sim-confirm', text: '삭제 실행', class: 'bg-orange-600 text-white font-bold py-2 px-6' }
+                ]);
+            });
             
             modal.addEventListener('click', async (e) => {
                 const targetId = e.target.id;
@@ -507,6 +512,21 @@
                         } else {
                             await renderAdminDashboard();
                             showModal('완료', '모든 데이터가 성공적으로 삭제되었습니다.', [{ id: 'modal-ok', text: '확인', class: 'bg-indigo-600 text-white font-bold py-2 px-6' }]);
+                        }
+                        break;
+                    case 'modal-delete-sim-confirm':
+                        hideModal();
+                        showModal('알림', '<div class="loader"></div><p class="text-center">시뮬레이션 데이터를 삭제하는 중입니다...</p>', []);
+                        const { error: simError } = await db.from('attendees').delete().like('email', 'sim_%');
+                        if (simError) {
+                             if (simError.code === '42501') {
+                                showModal('오류: 보안 정책 위반', 'Supabase 데이터베이스의 Row Level Security(RLS) 정책으로 인해 삭제가 차단되었습니다.<br><br><b>해결 방법:</b><br>1. Supabase 프로젝트 대시보드로 이동<br>2. Table Editor에서 "attendees" 테이블 선택<br>3. 상단의 "RLS Enabled" 토글을 비활성화', [{ id: 'modal-ok', text: '확인', class: 'bg-red-600 text-white font-bold py-2 px-6' }]);
+                            } else {
+                                showModal('오류', '데이터 삭제 중 오류가 발생했습니다.', [{ id: 'modal-ok', text: '확인', class: 'bg-red-600 text-white font-bold py-2 px-6' }]);
+                            }
+                        } else {
+                            await renderAdminDashboard();
+                            showModal('완료', '모든 시뮬레이션 데이터가 성공적으로 삭제되었습니다.', [{ id: 'modal-ok', text: '확인', class: 'bg-indigo-600 text-white font-bold py-2 px-6' }]);
                         }
                         break;
                     case 'modal-save-image':
