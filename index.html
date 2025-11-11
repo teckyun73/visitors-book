@@ -325,7 +325,7 @@
                 }
                 const existingTickets = new Set(existingAttendees.map(a => a.ticket));
 
-                const allPossibleTickets = Array.from({ length: 200 }, (_, i) => `atec${(i + 1).toString().padStart(3, '0')}`);
+                const allPossibleTickets = Array.from({ length: 300 }, (_, i) => `atec${(i + 1).toString().padStart(3, '0')}`);
                 let availableTickets = allPossibleTickets.filter(t => !existingTickets.has(t));
 
                 availableTickets.sort(() => 0.5 - Math.random());
